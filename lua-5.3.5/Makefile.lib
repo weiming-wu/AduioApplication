@@ -1,0 +1,53 @@
+C_COMPILER    		  := aarch64-rockchip-linux-gnu-gcc
+CPLUSPLUS_COMPILER    := aarch64-rockchip-linux-gnu-g++
+AR					  := aarch64-rockchip-linux-gnu-ar
+RM					  := rm
+
+#DEFINES                 := -DOS_ARM_LINUX -DLINUX $(PLATFORM_DEFINES)   
+
+
+CPLUSPLUS_SOURCES 		:= $(wildcard *.cpp)
+C_SOURCES				:= $(wildcard *.c)
+
+
+CPLUSPLUS_OBJS        	:= $(patsubst %.cpp, %.o, $(CPLUSPLUS_SOURCES))
+C_OBJS        			:= $(patsubst %.c, %.o, $(C_SOURCES))
+
+CPLUSPLUS_DEPENDENCE    := $(CPLUSPLUS_OBJS:.o=.cpp.dep)
+C_DEPENDENCE            := $(C_OBJS:.o=.c.dep)
+
+INCLUDEDIRS	    :=
+
+COMPILE_FLAGS   = -Wall -ffunction-sections -fdata-sections $(DEFINES)
+
+ifeq ($(RELEASE), 1)
+else
+	COMPILE_FLAGS += -g
+endif
+LIBTARGET	:= liblua.a
+$(LIBTARGET): $(CPLUSPLUS_OBJS) $(C_OBJS)
+	$(AR) rcs $@ $^
+	
+$(CPLUSPLUS_OBJS): %.o: %.cpp
+	$(CPLUSPLUS_COMPILER) $(COMPILE_FLAGS) $(INCLUDEDIRS) -c -o $@ $<
+
+$(C_OBJS): %.o: %.c
+	$(C_COMPILER) $(COMPILE_FLAGS) $(INCLUDEDIRS) -c -o $@ $<
+
+.PHONY: clean
+clean:
+	$(RM) $(CPLUSPLUS_OBJS) $(C_OBJS) $(LIBTARGET) $(CPLUSPLUS_DEPENDENCE) $(C_DEPENDENCE)
+
+#依赖
+sinclude $(CPLUSPLUS_DEPENDENCE)
+sinclude $(C_DEPENDENCE)
+$(CPLUSPLUS_DEPENDENCE): %.cpp.dep: %.cpp
+	@$(CPLUSPLUS_COMPILER) -MM $(COMPILE_FLAGS) $(INCLUDEDIRS) $< > $@.tmp
+	@sed 's,\([a-zA-Z0-9_]*\)\.o[ :]*,$*\.o $@ : ,g' < $@.tmp > $@
+	@$(RM) $@.tmp
+
+$(C_DEPENDENCE):%.c.dep: %.c
+	@$(C_COMPILER) -MM $(COMPILE_FLAGS) $(INCLUDEDIRS) $< > $@.tmp
+	@sed 's,\([a-zA-Z0-9_]*\)\.o[ :]*,$*\.o $@ : ,g' < $@.tmp > $@
+#	sed 's,\($*\)\.o[ :]*,\1.o $@ ,g' < $@.tmp > $@
+	@$(RM) $@.tmp
